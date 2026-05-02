@@ -71,6 +71,18 @@ def main(page: ft.Page):
         
         if res["status"] == "success":
             page.session_data["role"] = username
+            
+            # --- OBTENCIÓN DE DATOS EN TIEMPO REAL ---
+            olt_engine = page.session_data["olt_engine"]
+            datos_reales = olt_engine.obtener_datos_tiempo_real()
+            
+            page.session_data["olt_modelo"] = datos_reales["modelo"]
+            page.session_data["olt_temp"] = datos_reales["temp"]
+            page.session_data["olt_voltaje"] = datos_reales["voltaje"]
+            page.session_data["olt_onus"] = datos_reales["onus"]
+            page.session_data["olt_cards"] = datos_reales["slots"]
+            # -----------------------------------------
+            
             page.clean()
             page.vertical_alignment = ft.MainAxisAlignment.START
             page.add(generar_dashboard_con_menu())
