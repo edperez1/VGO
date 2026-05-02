@@ -2,7 +2,7 @@ import sys
 
 class CompleteEngine:
     def __init__(self):
-        # Catálogo completo con todas las variantes incluyendo el formato completo de las ONUs
+        # 1. Catálogo original completo
         self.commands = [
             "show version", "show running-config", "show startup-config", "show run interface gpon-olt_1/1/1","show clock",
             "show card", "show run interface gpon-onu_1/1/8:4","show subrack", "show power", "show fan", "show temperature",
@@ -47,16 +47,46 @@ class CompleteEngine:
             "service-port multi-service", "username password", "pon onu-type", "write memory",
             "reboot", "reset-card", "swap"
         ]
+
+        # 2. Agregar abreviaciones comunes (Alias)
+        self.commands += [
+            "sh ver", "sh run", "sh run int", "conf t", "wr mem",
+            "sh sys", "sh card", "sh int brief", "sh vlan sum",
+            "sh mac", "sh ont", "sh onu", "sh cpu", "sh mem",
+            "sh proc", "sh log", "sh users", "sh ntp", "sh snmp",
+            "sh qos", "sh traffic", "sh gpon onu state", "sh gpon onu detail",
+            "sh gpon onu dist", "sh pon power", "sh gpon remote-onu model",
+            "sh gpon remote-onu equip", "sh gpon remote-onu eth", "sh gpon remote-onu wifi"
+        ]
         
         self.history = []
         self.history_index = -1
 
     def get_progressive_options(self, current_input):
-        current_input = current_input.lower().strip()
-        if not current_input:
+        current_input_clean = current_input.lower().strip()
+        if not current_input_clean:
             return ""
 
-        matches = [c for c in self.commands if c.startswith(current_input)]
+        tokens = current_input_clean.split()
+        
+        # Lógica progresiva por tokens
+        for cmd in self.commands:
+            cmd_tokens = cmd.lower().split()
+            
+            # Verifica que cada token coincida con el inicio de la palabra correspondiente
+            if len(tokens) <= len(cmd_tokens) and all(
+                cmd_tokens[i].startswith(tokens[i]) for i in range(len(tokens))
+            ):
+                # Si el último token está incompleto, lo completa
+                if not cmd_tokens[len(tokens)-1] == tokens[-1]:
+                    tokens[-1] = cmd_tokens[len(tokens)-1]
+                    return " ".join(tokens)
+                # Si ya está completo, añade la siguiente palabra del comando
+                elif len(tokens) < len(cmd_tokens):
+                    return " ".join(tokens + [cmd_tokens[len(tokens)]])
+
+        # 3. Fallback: coincidencia parcial (si nada de lo anterior funcionó)
+        matches = [c for c in self.commands if current_input_clean in c.lower()]
         if matches:
             return matches[0]
 
