@@ -39,6 +39,21 @@ def main(page: ft.Page):
         mostrar_pantalla_inicial()
         page.update()
 
+    # --- NUEVA FUNCIÓN DE DESCONEXIÓN DE OLT ---
+    def disconnect_olt(e):
+        """Lógica para limpiar por completo la conexión y el overlay de Flet"""
+        page.session_data["olt_ip"] = None
+        page.session_data["olt_engine"] = None
+        page.session_data["role"] = None
+        
+        # Limpiamos todos los elementos en pantalla y en la memoria del overlay
+        page.clean()
+        page.overlay.clear()
+        
+        page.vertical_alignment = ft.MainAxisAlignment.CENTER
+        mostrar_pantalla_inicial()
+        page.update()
+
     def generar_dashboard_con_menu():
         """
         CORRECCIÓN: Ahora pasamos 'page', 'ir_a_activacion' y 'logout'
@@ -70,8 +85,21 @@ def main(page: ft.Page):
             page.session_data["olt_ip"] = ip_input.value
             page.session_data["olt_engine"] = OLTEngine(ip_input.value)
             page.clean()
+            
             # Asegúrate de que login_view reciba los parámetros correctos
             page.add(get_login_view(handle_login, page))
+            
+            # Botón de desconexión integrado de forma segura
+            page.add(
+                ft.Container(
+                    content=ft.TextButton(
+                        "← Cambiar IP de la OLT", 
+                        on_click=disconnect_olt,
+                        style=ft.ButtonStyle(color=ft.Colors.GREY_400)
+                    ),
+                    margin=ft.margin.only(top=10)
+                )
+            )
             page.update()
 
     # --- PANTALLA DE INICIO ---

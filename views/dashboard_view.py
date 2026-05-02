@@ -1,54 +1,59 @@
+import sys
+import os
 import flet as ft
+
+# Aseguramos la ruta para poder importar el módulo 'core'
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from core.complete_engine import CompleteEngine
 
 def get_dashboard_view(page: ft.Page, ir_a_activacion, logout):
     olt = page.session_data.get("olt_engine")
+    engine = CompleteEngine()
     
-    # Prompt inicial
     prompt_inicial = "OLT#"
     if olt and hasattr(olt, 'last_prompt') and olt.last_prompt:
         prompt_inicial = olt.last_prompt
 
     state = {"prompt": prompt_inicial}
-    # Lista de comandos para el autocompletado
-    comandos_disponibles = [
-        "show", "configure terminal", "show gpon onu unconfigured", 
-        "interface gpon-olt_", "display board 0", "exit", "write memory", "onu profile vlan"
-    ]
 
-    # --- REINTEGRACIÓN: LÓGICA DE AUTOCOMPLETADO (TAB / FLECHA DERECHA) ---
     def manejar_teclado(e: ft.KeyboardEvent):
         if e.key == "Arrow Right" or e.key == "Tab":
-            valor_actual = txt_comando_directo.value.lower().strip()
+            valor_actual = txt_comando_directo.value.strip()
             if valor_actual:
-                coincidencias = [c for c in comandos_disponibles if c.startswith(valor_actual)]
-                if coincidencias:
-                    txt_comando_directo.value = coincidencias[0]
+                sugerencia = engine.get_progressive_options(valor_actual)
+                if sugerencia:
+                    txt_comando_directo.value = sugerencia
                     txt_comando_directo.focus()
                     page.update()
+                    
+        elif e.key == "Arrow Up":
+            comando_anterior = engine.get_previous_command()
+            if comando_anterior:
+                txt_comando_directo.value = comando_anterior
+                page.update()
+        elif e.key == "Arrow Down":
+            comando_siguiente = engine.get_next_command()
+            txt_comando_directo.value = comando_siguiente
+            page.update()
         
     page.on_keyboard_event = manejar_teclado
 
-    # --- LÓGICA DE ENVÍO "ESPEJO" ---
     def enviar_comando_manual(e):
         comando = txt_comando_directo.value.strip()
         if not comando:
             return
 
-        # Reflejamos prompt + comando
+        engine.add_to_history(comando)
         consola_output.value += f"\n{state['prompt']}{comando}"
-        consola_output.update()
 
         try:
             if olt:
                 respuesta_raw = olt.send_command(comando)
+                consola_output.value += f"\n{respuesta_raw}"
+                
                 lineas = respuesta_raw.splitlines()
                 if lineas:
                     state["prompt"] = lineas[-1].strip()
-                    cuerpo = "\n".join(lineas[:-1])
-                    if cuerpo:
-                        consola_output.value += f"\n{cuerpo}"
-                else:
-                    consola_output.value += f"\n{respuesta_raw}"
             else:
                 consola_output.value += "\n% Error: No connection to OLT."
         except Exception as ex:
@@ -62,14 +67,17 @@ def get_dashboard_view(page: ft.Page, ir_a_activacion, logout):
     def limpiar_terminal(e):
         consola_output.value = f"--- VGO TERMINAL (NITIDO) ---\n{state['prompt']}"
         consola_output.update()
+        
+    def ejecutar_comando_rapido(comando_texto):
+        txt_comando_directo.value = comando_texto
+        enviar_comando_manual(None)
 
-    # --- REINTEGRACIÓN: ESTILO VISUAL (COLOR VERDE) ---
     consola_output = ft.TextField(
         value=f"--- VGO TERMINAL ACTIVA ---\n{state['prompt']}",
         multiline=True,
         read_only=True,
         bgcolor=ft.Colors.BLACK,
-        color=ft.Colors.GREEN_400, # Volvemos al verde de terminal clásica
+        color=ft.Colors.GREEN_400,
         text_size=13,
         text_style=ft.TextStyle(font_family="Consolas"),
         expand=True,
@@ -88,11 +96,11 @@ def get_dashboard_view(page: ft.Page, ir_a_activacion, logout):
     grid_botones = ft.Column([
         ft.Row([
             ft.FilledButton("MODO ACTIVACIÓN", icon=ft.Icons.ADD_CIRCLE, on_click=ir_a_activacion, style=estilo_boton, expand=True),
-            ft.FilledButton("SHOW UNCFG", icon=ft.Icons.SEARCH, style=estilo_boton, expand=True),
+            ft.FilledButton("SHOW UNCFG", icon=ft.Icons.SEARCH, on_click=lambda e: ejecutar_comando_rapido("show gpon onu unconfigured"), style=estilo_boton, expand=True),
         ], spacing=10),
         ft.Row([
-            ft.FilledButton("CONF T", icon=ft.Icons.SETTINGS, style=estilo_boton, expand=True),
-            ft.FilledButton("LISTA COMANDOS", icon=ft.Icons.LIST_ALT, style=estilo_boton, expand=True),
+            ft.FilledButton("CONF T", icon=ft.Icons.SETTINGS, on_click=lambda e: ejecutar_comando_rapido("configure terminal"), style=estilo_boton, expand=True),
+            ft.FilledButton("LISTA COMANDOS", icon=ft.Icons.LIST_ALT, on_click=lambda e: ejecutar_comando_rapido("show"), style=estilo_boton, expand=True),
         ], spacing=10),
     ], spacing=10, width=600)
 
